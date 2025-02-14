@@ -1,0 +1,70 @@
+print(paste0("Data e horário de início: ",Sys.time()))
+
+
+#install.packages("webdriver")
+#webdriver::install_phantomjs()
+
+library(rvest)
+library(httr)
+library(tidyverse)
+library(webdriver)
+
+df_final <- data.frame()
+
+################################################################################
+## Início Meliuz
+##
+pjs <- run_phantomjs()
+ses <- Session$new(port = pjs$port)
+ses$go("https://www.meliuz.com.br/desconto/cupom-desconto-amazon")
+install <- ses$findElement(".partner-pg__hero-section__redirect-btn")
+meliuz_df <- data.frame(
+  loja = "Amazon",
+  aplicativo = "Meliuz",
+  cashback = parse_number(install$getText()),
+  dia_hora = Sys.time()
+)
+df_final <- rbind(df_final, meliuz_df)
+ses$go("https://www.meliuz.com.br/desconto/cupom-insider-store")
+install <- ses$findElement(".partner-pg__hero-section__redirect-btn")
+meliuz_df <- data.frame(
+  loja = "Insider",
+  aplicativo = "Meliuz",
+  cashback = parse_number(install$getText()),
+  dia_hora = Sys.time()
+)
+df_final <- rbind(df_final, meliuz_df)
+################################################################################
+
+################################################################################
+## Início Buscape
+##
+url <- "https://www.buscape.com.br/landing-page/cashback-buscape-amazon"
+html <- read_html(url)
+buscape_df <- data_frame(
+  loja = "Amazon",
+  aplicativo = "Buscape",
+  cashback = parse_number((html %>% html_nodes("strong") %>%  html_text2())[2]),
+  dia_hora = Sys.time()
+)
+################################################################################
+
+################################################################################
+## Início Cuponomia
+##
+pjs <- run_phantomjs()
+ses <- Session$new(port = pjs$port)
+ses$go("https://www.cuponomia.com.br/desconto/amazon")
+install <- ses$findElement(".rewardsTag-cashback")
+#install$getName()
+#install$getText()
+cuponomia_df <- data.frame(
+  loja = "Amazon",
+  aplicativo = "Cuponomia",
+  cashback = parse_number(install$getText()),
+  dia_hora = Sys.time()
+)
+################################################################################
+
+df_final <- rbind(meliuz_df, buscape_df, cuponomia_df)
+

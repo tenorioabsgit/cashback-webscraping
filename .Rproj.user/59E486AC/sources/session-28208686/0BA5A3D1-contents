@@ -1,0 +1,25 @@
+library(rvest)
+library(httr)
+library(tidyverse)
+
+url_meliuz <- "https://www.meliuz.com.br/desconto-lojas"
+html_meliuz <- read_html(url_meliuz)
+lista_meliuz <- html_meliuz %>% html_elements("a") %>% html_attr('href')
+links_meliuz <- paste0("https://www.meliuz.com.br", lista_meliuz)
+
+df_meliuz <- data.frame()
+for (i in 1:length(links_meliuz)) {
+  print(paste0("Capturando consulta ", i, " de ", length(links_meliuz)))
+  links_meliuz_ <- read_html(links_meliuz[i])
+  try(loja <- links_meliuz_ %>% html_elements('.partner-pg__hero-section__summary') %>% html_nodes("h1") %>% html_text2(), silent = T)
+  data <- format(Sys.time(), "%D")
+  try(percentual <- links_meliuz_ %>% html_elements('.partner-pg__hero-section__summary-logged') %>% html_nodes("strong") %>% html_nodes("span") %>% html_text2(), silent = T)
+  try(df_meliuz_ <- data_frame(loja, data, percentual), silent = T)
+  try(df_meliuz <- rbind(df_meliuz, df_meliuz_), silent = T)
+  #Sys.sleep(2)
+}
+
+df_meliuz$loja <- str_remove(string = df_meliuz$loja, pattern = "Cupons e ofertas ")
+df_meliuz$loja <- str_remove(string = df_meliuz$loja, pattern = "Cupom ")
+df_meliuz$loja <- str_remove(string = df_meliuz$loja, pattern = "de Desconto ")
+df_meliuz <- df_meliuz %>% dplyr::distinct()

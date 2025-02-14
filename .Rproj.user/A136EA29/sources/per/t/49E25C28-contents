@@ -1,0 +1,199 @@
+# Carregue as bibliotecas necessárias
+
+install.packages("RSelenium")
+library(RSelenium)
+library(wdman)
+library(netstat)
+library(rvest)
+library(tidyverse)
+
+lojas_interesse <- c("Amazon")
+valor_cashback <- 6
+
+#selenium()
+selenium_object <- selenium(retcommand = T, check = F)
+
+#binman::list_versions("geckodriver")
+
+# com a janela robô
+# remoteDriver <- rsDriver(browser = "firefox",
+#                          geckover = "0.33.0",
+#                          verbose = F,
+#                          port = free_port())
+
+# sem janela robô
+remoteDriver <- rsDriver(browser = "firefox",
+                         geckover = "0.33.0",
+                         verbose = F,
+                         port = free_port(),
+                         extraCapabilities = list("moz:firefoxOptions" = list(args = list("-headless"))))
+
+
+remDr <- remoteDriver[["client"]]
+
+# Navegue até a página
+# buscape
+pagination <- 1
+df_buscape <- data_frame()
+while (pagination <= 13) {
+  print(paste0("Raspando página ",pagination, " de 13"))
+  url <- paste0("https://www.buscape.com.br/cupom-de-desconto/lojas?coupon=false&page=",pagination,"&cashback=true")
+  remDr$navigate(url)
+  Sys.sleep(1)
+  page <- read_html(remDr$getPageSource()[[1]])
+  Sys.sleep(1)
+  loja <- page %>% html_elements(".name") %>% html_text2()
+  cashback <- page %>% html_elements(".Text_MobileTagXs__SHXq9") %>% html_text2()
+  cashback <- cashback[3:length(cashback)]
+  app <- "buscape"
+  df_passagem <- data_frame(app, loja, cashback)
+  df_buscape <- rbind(df_buscape, df_passagem)
+  pagination <- pagination + 1
+}
+
+df_buscape_ <- data_frame()
+for (i in 1:nrow(df_buscape)) {
+  for (p in 1:length(lojas_interesse)) {
+    if (str_detect(string = df_buscape$loja[i], regex(pattern = lojas_interesse[p], T))) {
+      df_passagem <- df_buscape[i,]
+      df_buscape_ <- rbind(df_buscape_, df_passagem)
+    }  
+  }
+}
+df_buscape <- df_buscape_
+
+# Navegue até a página
+# meliuz
+df_meliuz <- data_frame()
+url <- "https://www.meliuz.com.br/desconto-lojas"
+remDr$navigate(url)
+Sys.sleep(1)
+page <- read_html(remDr$getPageSource()[[1]])
+Sys.sleep(1)
+lojas <- page %>% html_elements(".jYqAqV") %>% html_elements('a') %>% html_text2()
+
+lista <- character()
+for (i in 1:length(lojas)) {
+  for (p in 1:length(lojas_interesse)) {
+    if (str_detect(string = lojas[i], regex(pattern = lojas_interesse[p], T))) {
+      lista_ <- lojas[i]
+      lista <- append(lista, lista_)
+    }  
+  }
+}
+lojas <- lista
+
+links <- paste0("https://www.meliuz.com.br",page %>% html_elements(".jYqAqV") %>% html_elements('a') %>% html_attr('href'))
+lista <- character()
+for (i in 1:length(links)) {
+  for (p in 1:length(lojas_interesse)) {
+    if (str_detect(string = links[i], regex(pattern = lojas_interesse[p], T))) {
+      lista_ <- links[i]
+      lista <- append(lista, lista_)
+    }  
+  }
+}
+links <- lista
+
+for (i in 1:length(links)) {
+  print(paste0("Raspando loja ",i, " de ",length(links)))
+  url <- links[i]
+  loja <- lojas[i]
+  app <- "meliuz"
+  remDr$navigate(url)
+  #Sys.sleep(1)
+  page <- read_html(remDr$getPageSource()[[1]])
+  #Sys.sleep(1)
+  cashback <- page %>% html_element(".partner-pg__hero-section__redirect-btn")%>% html_text2()
+  df_passagem <- data_frame(app, loja, cashback)
+  df_meliuz <- rbind(df_meliuz, df_passagem)
+}
+
+# Navegue até a página
+# cuponomia
+df_cuponomia <- data_frame()
+url <- "https://www.cuponomia.com.br/desconto"
+remDr$navigate(url)
+Sys.sleep(1)
+page <- read_html(remDr$getPageSource()[[1]])
+Sys.sleep(1)
+lojas <- page %>% html_elements(".list-letter-item") %>% html_text()
+
+lista <- character()
+for (i in 1:length(lojas)) {
+  for (p in 1:length(lojas_interesse)) {
+    if (str_detect(string = lojas[i], regex(pattern = lojas_interesse[p], T))) {
+      lista_ <- lojas[i]
+      lista <- append(lista, lista_)
+    }  
+  }
+}
+lojas <- lista
+
+lojas_ <- tolower(lojas)
+lojas_ <- gsub(" ", "-", lojas_)
+lojas_ <- iconv(lojas_, from = "UTF-8", to = "ASCII//TRANSLIT")
+lojas_ <- gsub("[^a-zA-Z0-9-]", "", lojas_)
+lojas_ <- sub("-$", "", lojas_)
+links <- paste0("https://www.cuponomia.com.br/desconto/", lojas_)
+
+for (i in 1:length(links)) {
+  print(paste0("Raspando loja ",i, " de ",length(links)))
+  url <- links[i]
+  loja <- lojas[i]
+  app <- "cuponomia"
+  remDr$navigate(url)
+  #Sys.sleep(1)
+  page <- read_html(remDr$getPageSource()[[1]])
+  #Sys.sleep(1)
+  cashback <- page %>% html_element(".rewardsTag-cashback")%>% html_text2()
+  df_passagem <- data_frame(app, loja, cashback)
+  df_cuponomia <- rbind(df_cuponomia, df_passagem)
+}
+
+df_final <- rbind(df_buscape,
+                  df_meliuz,
+                  df_cuponomia)
+
+# rotina para filtrar numeros na coluna de cashback
+padrao <- "\\d+"  # O padrão "\\d+" corresponde a um ou mais dígitos
+filtra_numeros <- grep(padrao, df_final$cashback)
+df_final <- df_final[filtra_numeros,]
+df_final$cashback <- gsub(pattern = "[A-Za-z]", x = df_final$cashback, replacement = "")
+df_final <- subset(df_final, grepl("%", cashback))
+df_final$cashback <- gsub(" ", "", df_final$cashback)
+df_final <- df_final[order(df_final$loja), ]
+
+# telegram
+library(telegram)
+Sys.setenv(R_TELEGRAM_BOT_Algoritimus_bot='6572835659:AAGZg_ioEYqozvl80jHObk7DEUbiWCB8O00')
+bot <- TGBot$new(token = bot_token('Algoritimus_bot'))
+bot$getMe()
+msgs <- bot$getUpdates()
+#msgs$message$chat$id[1]
+#bot$set_default_chat_id(1924760630)
+bot$set_default_chat_id(-4075915981)
+#bot$sendMessage('alta!')
+
+df_final$telegram <- str_replace(string = df_final$cashback, pattern = "%", replacement = "")
+df_final$telegram <- str_replace(string = df_final$telegram, pattern = ",", replacement = ".")
+df_final$telegram <- parse_number(df_final$telegram)
+
+# muda o valor de cashback
+df_telegram <- df_final %>% filter(telegram >= valor_cashback)
+
+texto <- character()
+for (i in 1:nrow(df_telegram)) {
+  app <- df_telegram$app[i]
+  loja <- df_telegram$loja[i]
+  cashback <- df_telegram$cashback[i]
+  texto_ <- paste0(app," | ", loja, " | ", cashback)
+  texto <- append(texto, texto_)
+}
+
+if (nrow(df_telegram) >= 1) {
+  for (i in 1:length(texto)) {
+    bot$sendMessage(texto[i])    
+  }
+}
+
