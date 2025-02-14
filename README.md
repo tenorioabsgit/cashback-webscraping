@@ -112,10 +112,6 @@ pagination <- 1  # Reduza o número máximo de páginas para buscar
 
 ---
 
-## 👨‍💻 Autor
 
-👤 **José Tenório Abs Junior**  
-📧 [Seu Email]  
-🏛 **IBPAD - Instituto Brasileiro de Pesquisa e Análise de Dados**  
 
 🚀 **Agora você pode monitorar cashback automaticamente e receber alertas no Telegram!** Qualquer dúvida, me avise! 😊
